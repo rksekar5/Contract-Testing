@@ -1,0 +1,22 @@
+{
+  "name": "contract-testing-demo-consumer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pets API consumer Pact tests for the contract-testing demo",
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest --runInBand",
+    "publish-pacts": "npx tsx publish-pacts.ts"
+  },
+  "dependencies": {
+    "axios": "^1.7.2"
+  },
+  "devDependencies": {
+    "@pact-foundation/pact": "^12.5.0",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0",
+    "typescript": "^5.5.0"
+  }
+}

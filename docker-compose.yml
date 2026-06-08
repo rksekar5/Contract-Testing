@@ -1,0 +1,42 @@
+# The provider runs by default. The Pact Broker is behind an optional profile so
+# the core demo stays lightweight:  docker compose --profile broker up -d
+services:
+  provider:
+    build: ./provider
+    image: contract-testing-demo-provider
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+
+  # Optional: full pipeline with a Pact Broker. Enable with `--profile broker`.
+  broker-db:
+    image: postgres:16-alpine
+    profiles: ["broker"]
+    environment:
+      - POSTGRES_USER=pact
+      - POSTGRES_PASSWORD=pact
+      - POSTGRES_DB=pact
+    volumes:
+      - broker-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pact"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  broker:
+    image: pactfoundation/pact-broker:latest
+    profiles: ["broker"]
+    ports:
+      - "9292:9292"
+    depends_on:
+      broker-db:
+        condition: service_healthy
+    environment:
+      - PACT_BROKER_DATABASE_URL=postgres://pact:pact@broker-db/pact
+      - PACT_BROKER_BASIC_AUTH_USERNAME=pact
+      - PACT_BROKER_BASIC_AUTH_PASSWORD=pact
+
+volumes:
+  broker-db:

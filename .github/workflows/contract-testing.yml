@@ -1,0 +1,107 @@
+name: Contract Testing Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # 1. Generate the consumer contract (AI/cached) + run consumer tests
+  # ─────────────────────────────────────────────────────────────────
+  consumer:
+    name: "Generate & Test Consumer Contract"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            consumer/package-lock.json
+            ai-generator/package-lock.json
+
+      - name: Install consumer dependencies
+        run: cd consumer && npm ci
+
+      - name: Install ai-generator dependencies
+        run: cd ai-generator && npm ci
+
+      - name: Generate consumer contract
+        run: make generate-cached
+        # Uses the hand-reviewed cached test in CI (no API key required).
+        # Set ANTHROPIC_API_KEY as a secret to activate the live SDK/MCP path.
+
+      - name: Run consumer tests against Pact mock (records pact file)
+        run: make consumer-test
+
+      - name: Upload pact artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pacts
+          path: consumer/pacts/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────
+  # 2. Verify the contract against the CORRECT provider → should PASS
+  # ─────────────────────────────────────────────────────────────────
+  verify-correct:
+    name: "Provider Verification — Correct (expect PASS)"
+    needs: consumer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: provider/package-lock.json
+
+      - name: Install provider dependencies
+        run: cd provider && npm ci
+
+      - name: Download pact artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pacts
+          path: consumer/pacts/
+
+      - name: Verify contract against correct provider
+        run: make verify
+
+  # ─────────────────────────────────────────────────────────────────
+  # 3. Verify the same contract against the BROKEN provider → FAIL
+  #    This job demonstrates shift-left: the contract catches the
+  #    breaking field rename (id → petId) before any UI test runs.
+  # ─────────────────────────────────────────────────────────────────
+  verify-broken:
+    name: "Provider Verification — Broken (expect FAIL — demo payoff)"
+    needs: consumer
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: provider/package-lock.json
+
+      - name: Install provider dependencies
+        run: cd provider && npm ci
+
+      - name: Download pact artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pacts
+          path: consumer/pacts/
+
+      - name: Verify contract against broken provider (expected to fail)
+        run: make verify-broken
+        # This step intentionally fails — it proves the contract catches the
+        # breaking change (id → petId) that would otherwise reach UI testing.

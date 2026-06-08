@@ -1,0 +1,22 @@
+{
+  "name": "contract-testing-demo-provider",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pets provider API (the service under test) for the contract-testing demo",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "verify": "tsx verify/verify-provider.ts"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@pact-foundation/pact": "^12.5.0",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Pets Adoption API",
+    "version": "1.0.0",
+    "description": "A small service for an animal-adoption shelter. Consumers list pets, fetch a pet by id, and register new pets. This spec is the input to the AI contract generator."
+  },
+  "servers": [{ "url": "http://localhost:3001/api/v1", "description": "Local provider" }],
+  "paths": {
+    "/pets": {
+      "get": {
+        "operationId": "listPets",
+        "summary": "List all pets currently in the shelter",
+        "responses": {
+          "200": {
+            "description": "An array of pets.",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Pet" } },
+                "example": [
+                  { "id": "1", "name": "Biscuit", "species": "dog", "age": 3 },
+                  { "id": "2", "name": "Mittens", "species": "cat", "age": 5 }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createPet",
+        "summary": "Register a new pet",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NewPet" },
+              "example": { "name": "Pickle", "species": "rabbit", "age": 1 }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The pet was created.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Pet" },
+                "example": { "id": "4", "name": "Pickle", "species": "rabbit", "age": 1 }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid pet payload.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "name is required and must be a non-empty string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pets/{id}": {
+      "get": {
+        "operationId": "getPetById",
+        "summary": "Fetch a single pet by id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The pet's unique identifier",
+            "example": "1"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested pet.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Pet" },
+                "example": { "id": "1", "name": "Biscuit", "species": "dog", "age": 3 }
+              }
+            }
+          },
+          "404": {
+            "description": "No pet exists with the given id.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "error": "Pet 999 not found" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Pet": {
+        "type": "object",
+        "required": ["id", "name", "species", "age"],
+        "properties": {
+          "id": { "type": "string", "description": "Unique identifier", "example": "1" },
+          "name": { "type": "string", "description": "The pet's name", "example": "Biscuit" },
+          "species": { "type": "string", "description": "Species", "example": "dog" },
+          "age": { "type": "integer", "description": "Age in years", "example": 3 }
+        }
+      },
+      "NewPet": {
+        "type": "object",
+        "required": ["name", "species", "age"],
+        "properties": {
+          "name": { "type": "string", "example": "Pickle" },
+          "species": { "type": "string", "example": "rabbit" },
+          "age": { "type": "integer", "example": 1 }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "type": "string", "description": "Human-readable error message" }
+        }
+      }
+    }
+  }
+}

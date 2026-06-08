@@ -1,0 +1,19 @@
+{
+  "name": "contract-testing-demo-ai-generator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Generates the consumer Pact test from the OpenAPI spec using Claude Opus (PactFlow MCP headline, SDK + cached fallbacks)",
+  "type": "commonjs",
+  "scripts": {
+    "generate": "tsx generate.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.102.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  }
+}

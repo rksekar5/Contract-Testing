@@ -1,0 +1,14 @@
+{
+  "$comment": "SmartBear MCP server wired to the self-hosted Pact Broker. Credentials are read from environment variables so nothing sensitive is committed. Start the broker first: docker compose --profile broker up -d",
+  "mcpServers": {
+    "smartbear-contract-testing": {
+      "command": "npx",
+      "args": ["@smartbear/mcp@latest"],
+      "env": {
+        "PACT_BROKER_BASE_URL": "${PACT_BROKER_BASE_URL}",
+        "PACT_BROKER_USERNAME": "${PACT_BROKER_USERNAME}",
+        "PACT_BROKER_PASSWORD": "${PACT_BROKER_PASSWORD}"
+      }
+    }
+  }
+}
