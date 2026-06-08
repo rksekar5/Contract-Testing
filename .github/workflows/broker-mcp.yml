@@ -58,7 +58,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # @smartbear/mcp@latest requires enableCompileCache (node:module),
+          # available since Node.js 22.8 — use 22.x for this workflow.
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: |
             consumer/package-lock.json
