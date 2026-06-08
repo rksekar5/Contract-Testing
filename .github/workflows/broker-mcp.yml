@@ -1,0 +1,121 @@
+name: Contract Testing — Pact Broker + SmartBear MCP
+
+# Full broker-integrated pipeline.
+# Runs a self-hosted Pact Broker (postgres + pact-broker containers) and uses
+# broker-orchestrate.ts to talk to it via the SmartBear MCP protocol:
+#   setup            → create 'production' environment
+#   publish          → publish consumer contracts
+#   record-deployment → record provider deployed to production
+#   can-i-deploy     → gate on contract compatibility (consumer + broken provider)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PACT_BROKER_BASE_URL: http://localhost:9292
+  PACT_BROKER_USERNAME: pact
+  PACT_BROKER_PASSWORD: pact
+
+jobs:
+  broker-pipeline:
+    name: "Pact Broker Pipeline (SmartBear MCP)"
+    runs-on: ubuntu-latest
+
+    services:
+      # Postgres backing store for the broker
+      broker-db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pact
+          POSTGRES_PASSWORD: pact
+          POSTGRES_DB: pact
+        options: >-
+          --health-cmd "pg_isready -U pact"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      # Self-hosted Pact Broker
+      broker:
+        image: pactfoundation/pact-broker:latest
+        ports:
+          - 9292:9292
+        env:
+          PACT_BROKER_DATABASE_URL: postgres://pact:pact@broker-db/pact
+          PACT_BROKER_BASIC_AUTH_USERNAME: pact
+          PACT_BROKER_BASIC_AUTH_PASSWORD: pact
+        options: >-
+          --health-cmd "wget -qO- http://localhost:9292/diagnostic/status/heartbeat > /dev/null"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+          --health-start-period 15s
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            consumer/package-lock.json
+            provider/package-lock.json
+            ai-generator/package-lock.json
+
+      - name: Install all dependencies
+        run: |
+          cd consumer   && npm ci
+          cd ../provider && npm ci
+          cd ../ai-generator && npm ci
+
+      # ── 1. Generate consumer contract ────────────────────────────────────
+      - name: Generate consumer contract (cached)
+        run: make generate-cached
+
+      # ── 2. Run consumer tests → records pact file ────────────────────────
+      - name: Run consumer tests against Pact mock
+        run: make consumer-test
+
+      # ── 3. SmartBear MCP: create 'production' environment ────────────────
+      - name: "SmartBear MCP — setup: create 'production' environment"
+        run: cd ai-generator && npx tsx broker-orchestrate.ts setup
+
+      # ── 4. SmartBear MCP: publish consumer contracts to broker ───────────
+      - name: "SmartBear MCP — publish: consumer contracts → broker"
+        env:
+          CONSUMER_VERSION: ${{ github.sha }}
+          GIT_BRANCH: ${{ github.ref_name }}
+        run: cd ai-generator && npx tsx broker-orchestrate.ts publish
+
+      # ── 5. Verify correct provider (publishes verification results to broker)
+      - name: "Provider verification — correct (expect PASS, results → broker)"
+        env:
+          GIT_BRANCH: ${{ github.ref_name }}
+        run: make verify
+
+      # ── 6. SmartBear MCP: record provider deployed to production ─────────
+      - name: "SmartBear MCP — record-deployment: PetsProvider@1.0.0 → production"
+        run: cd ai-generator && npx tsx broker-orchestrate.ts record-deployment PetsProvider 1.0.0
+
+      # ── 7. SmartBear MCP: can-i-deploy consumer → PASS ───────────────────
+      - name: "SmartBear MCP — can-i-deploy: PetsWebConsumer → production (expect PASS)"
+        env:
+          CONSUMER_VERSION: ${{ github.sha }}
+        run: |
+          cd ai-generator && npx tsx broker-orchestrate.ts can-i-deploy PetsWebConsumer "$CONSUMER_VERSION"
+
+      # ── 8. Verify broken provider (expect FAIL — results published to broker)
+      - name: "Provider verification — broken (expect FAIL — demo payoff)"
+        continue-on-error: true
+        run: make verify-broken
+
+      # ── 9. SmartBear MCP: can-i-deploy broken provider → FAIL ────────────
+      #    The broken provider failed verification so the broker blocks its deployment.
+      - name: "SmartBear MCP — can-i-deploy: PetsProvider@0.0.0-broken → production (expect FAIL)"
+        continue-on-error: true
+        run: cd ai-generator && npx tsx broker-orchestrate.ts can-i-deploy PetsProvider 0.0.0-broken

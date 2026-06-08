@@ -56,6 +56,18 @@ demo: ## Full corrected pipeline: generate -> contract -> verify -> catch the br
 	-@$(MAKE) verify-broken
 	@echo "\n✅ Done. The contract caught the breaking change before any UI test ran."
 
+broker-setup: ## SmartBear MCP: create 'production' environment in the broker
+	cd ai-generator && npx tsx broker-orchestrate.ts setup
+
+broker-publish: ## SmartBear MCP: publish consumer contracts to the broker
+	cd ai-generator && npx tsx broker-orchestrate.ts publish
+
+broker-record-deployment: ## SmartBear MCP: record PetsProvider@1.0.0 deployed to production
+	cd ai-generator && npx tsx broker-orchestrate.ts record-deployment PetsProvider 1.0.0
+
+broker-can-i-deploy: ## SmartBear MCP: can-i-deploy check for PetsWebConsumer → production
+	cd ai-generator && npx tsx broker-orchestrate.ts can-i-deploy PetsWebConsumer
+
 clean: ## Remove generated artifacts + stop Docker
 	-rm -f consumer/src/pets.consumer.pact.test.ts
 	-rm -rf consumer/pacts
