@@ -48,12 +48,14 @@ jobs:
           PACT_BROKER_DATABASE_URL: postgres://pact:pact@broker-db/pact
           PACT_BROKER_BASIC_AUTH_USERNAME: pact
           PACT_BROKER_BASIC_AUTH_PASSWORD: pact
+          # Retry DB connection so the race with postgres startup is tolerated
+          PACT_BROKER_DATABASE_CONNECT_MAX_RETRIES: "5"
         options: >-
-          --health-cmd "wget -qO- http://localhost:9292/diagnostic/status/heartbeat > /dev/null"
+          --health-cmd "wget -q -O /dev/null http://localhost:9292/diagnostic/status/heartbeat"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 20
-          --health-start-period 15s
+          --health-start-period 30s
 
     steps:
       - uses: actions/checkout@v4
