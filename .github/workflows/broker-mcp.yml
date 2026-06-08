@@ -39,7 +39,9 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
-      # Self-hosted Pact Broker
+      # Self-hosted Pact Broker — no health-cmd override so the image's own
+      # HEALTHCHECK (wget --spider) is used. A curl wait-step below gives an
+      # extra 5 min for Puma to finish booting.
       broker:
         image: pactfoundation/pact-broker:latest
         ports:
@@ -48,14 +50,8 @@ jobs:
           PACT_BROKER_DATABASE_URL: postgres://pact:pact@broker-db/pact
           PACT_BROKER_BASIC_AUTH_USERNAME: pact
           PACT_BROKER_BASIC_AUTH_PASSWORD: pact
-          # Retry DB connection so the race with postgres startup is tolerated
-          PACT_BROKER_DATABASE_CONNECT_MAX_RETRIES: "5"
-        options: >-
-          --health-cmd "wget -q -O /dev/null http://localhost:9292/diagnostic/status/heartbeat"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 20
-          --health-start-period 30s
+          PACT_BROKER_DATABASE_CONNECT_MAX_RETRIES: "10"
+          PACT_BROKER_LOG_LEVEL: INFO
 
     steps:
       - uses: actions/checkout@v4
@@ -74,6 +70,23 @@ jobs:
           cd consumer   && npm ci
           cd ../provider && npm ci
           cd ../ai-generator && npm ci
+
+      # ── 0. Wait for Pact Broker to be ready ──────────────────────────────
+      - name: Wait for Pact Broker
+        run: |
+          echo "Polling Pact Broker on http://localhost:9292 ..."
+          for i in $(seq 1 60); do
+            if curl -sf -u pact:pact http://localhost:9292/diagnostic/status/heartbeat > /dev/null 2>&1; then
+              echo "✅ Pact Broker ready after $((i * 5))s"
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "❌ Broker did not start within 5 minutes"
+              exit 1
+            fi
+            echo "  waiting... ($i/60, $((i * 5))s elapsed)"
+            sleep 5
+          done
 
       # ── 1. Generate consumer contract ────────────────────────────────────
       - name: Generate consumer contract (cached)
